@@ -11,40 +11,28 @@
 #include "mc/legacy/ActorRuntimeID.h"
 #include "mc/world/actor/DataItemType.h"
 
+#include "PA/PlaceholderAPI.h"
 #include "HeadShow.h"
+#include "Config/ConfigManager.h"
 namespace hs {
 
 std::atomic<bool> gHeadShowRunning = false;
 
 ll::coro::CoroTask<> sendHeadShowPacketTask() {
     while (gHeadShowRunning) {
+        auto& config = ConfigManager::getInstance().get(); // 每次迭代都重新获取配置
         auto level = ll::service::getLevel();
         if (level) {
-            std::vector<std::string> actorDataBuffers;
-            for (auto entity : level->getRuntimeActorList()) {
-                BinaryStream stream;
-                stream.writeUnsignedVarInt64(entity->getRuntimeID().rawID, nullptr, nullptr);
-                // DataItem
-                stream.writeUnsignedVarInt(2, nullptr, nullptr);
-                stream.writeUnsignedVarInt((uint)ActorDataIDs::Name, nullptr, nullptr);
-                stream.writeUnsignedVarInt((uint)DataItemType::String, nullptr, nullptr);
-                stream.writeString(entity->getTypeName(), nullptr, nullptr);
-                stream.writeUnsignedVarInt((uint)ActorDataIDs::NametagAlwaysShow, nullptr, nullptr);
-                stream.writeUnsignedVarInt((uint)DataItemType::Byte, nullptr, nullptr);
-                stream.writeBool(true, nullptr, nullptr);
-                // Other
-                stream.writeUnsignedVarInt(0, nullptr, nullptr);
-                stream.writeUnsignedVarInt(0, nullptr, nullptr);
-                stream.writeUnsignedVarInt64(0, nullptr, nullptr);
-                actorDataBuffers.push_back(std::move(stream.mBuffer));
-            }
-
             level->forEachPlayer([&](Player& player) {
                 if (player.isSimulated()) {
                     return true;
                 }
+
                 for (auto entity : level->getRuntimeActorList()) {
                     if (entity->getDimensionId() != player.getDimensionId()) {
+                        continue;
+                    }
+                    if (entity->getPosition().distanceTo(player.getPosition()) > config.displayDistance) {
                         continue;
                     }
                     BinaryStream stream;
@@ -53,7 +41,21 @@ ll::coro::CoroTask<> sendHeadShowPacketTask() {
                     stream.writeUnsignedVarInt(2, nullptr, nullptr);
                     stream.writeUnsignedVarInt((uint)ActorDataIDs::Name, nullptr, nullptr);
                     stream.writeUnsignedVarInt((uint)DataItemType::String, nullptr, nullptr);
-                    stream.writeString(entity->getTypeName(), nullptr, nullptr);
+                    std::string entityTypeName = entity->getTypeName();
+                    auto it = config.entityNameOverrides.find(entityTypeName);
+                    if (it != config.entityNameOverrides.end()) {
+                        if (entityTypeName == "minecraft:player") {
+                            PA::PlayerContext ctx;
+                            ctx.player = &player; // Use the current player for player-specific placeholders
+                            stream.writeString(PA::PA_GetPlaceholderService()->replace(it->second, &ctx), nullptr, nullptr);
+                        } else {
+                            PA::ActorContext ctx;
+                            ctx.actor = entity;
+                            stream.writeString(PA::PA_GetPlaceholderService()->replace(it->second, &ctx), nullptr, nullptr);
+                        }
+                    } else {
+                        stream.writeString(entityTypeName, nullptr, nullptr);
+                    }
                     stream.writeUnsignedVarInt((uint)ActorDataIDs::NametagAlwaysShow, nullptr, nullptr);
                     stream.writeUnsignedVarInt((uint)DataItemType::Byte, nullptr, nullptr);
                     stream.writeBool(true, nullptr, nullptr);
@@ -68,7 +70,7 @@ ll::coro::CoroTask<> sendHeadShowPacketTask() {
             });
         }
         // TODO: Make update interval configurable
-        co_await std::chrono::milliseconds(50); // Default update interval
+        co_await std::chrono::milliseconds(config.refreshIntervalMs); // Default update interval
     }
     co_return;
 }

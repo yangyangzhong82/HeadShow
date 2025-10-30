@@ -1,0 +1,101 @@
+#include "ConfigManager.h"
+#include "config.h"
+#include "ConfigSerialization.h"
+#include <fstream>
+#include <functional>
+#include <nlohmann/json.hpp>
+#include <vector>
+#include "logger.h"
+
+
+ConfigManager& ConfigManager::getInstance() {
+    static ConfigManager instance;
+    return instance;
+}
+
+ConfigManager::ConfigManager() : mConfig(std::make_unique<Config>()) {}
+
+ConfigManager::~ConfigManager() = default;
+
+bool ConfigManager::load(const std::string& path) {
+    mConfigPath = path;
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        // 文件不存在，创建默认配置
+        hs::logger.info("Config file not found, creating a new one at: {}", path);
+        return save();
+    }
+
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+
+    nlohmann::json user_json;
+    try {
+        // 解析用户配置，允许注释
+        user_json = nlohmann::json::parse(content, nullptr, true, true);
+        // 填充内存中的配置对象。缺失的键将从结构体定义中获取默认值。
+        *mConfig = user_json.get<Config>();
+    } catch (const nlohmann::json::exception& e) {
+        hs::logger.error("Failed to parse config file: {}. Please check for syntax errors.", e.what());
+        return false;
+    }
+
+    // 触发重载回调
+    for (const auto& callback : mReloadCallbacks) {
+        callback(*mConfig);
+    }
+
+    // 检查缺失的键以警告用户。
+    nlohmann::json default_json = Config{}; // 创建一个默认配置对象并转换为json
+
+    // 递归函数查找缺失的键
+    std::function<void(const nlohmann::json&, const nlohmann::json&, std::string, std::vector<std::string>&)>
+        find_missing_keys =
+            [&](const nlohmann::json& d, const nlohmann::json& u, std::string p, std::vector<std::string>& m) {
+                for (const auto& item : d.items()) {
+                    if (!u.contains(item.key())) {
+                        m.push_back(p + item.key());
+                    } else if (item.value().is_object() && u.at(item.key()).is_object()) {
+                        find_missing_keys(item.value(), u.at(item.key()), p + item.key() + ".", m);
+                    }
+                }
+            };
+
+    std::vector<std::string> missing_keys;
+    find_missing_keys(default_json, user_json, "", missing_keys);
+
+    if (!missing_keys.empty()) {
+        hs::logger.warn("Your config file is missing some keys. The plugin will use default values for them.");
+        hs::logger.warn("This won't affect functionality, but you may want to add them to your config.json:");
+        for (const auto& key : missing_keys) {
+            hs::logger.warn("- {}", key);
+        }
+        hs::logger.warn("You can also delete your config.json to generate a new one with all keys on next startup.");
+    }
+
+    return true; // 不再保存，以保留用户文件的格式和注释
+}
+
+bool ConfigManager::reload() { return load(mConfigPath); }
+
+void ConfigManager::onReload(ReloadCallback callback) {
+    mReloadCallbacks.push_back(std::move(callback));
+}
+
+bool ConfigManager::save() {
+    try {
+        nlohmann::json json = *mConfig;
+        std::ofstream  file(mConfigPath);
+        file << json.dump(4);
+    } catch (const nlohmann::json::exception& e) {
+        hs::logger.error("Failed to save config file: {}", e.what());
+        return false;
+    }
+    return true;
+}
+
+
+
+Config& ConfigManager::get() { return *mConfig; }
+
+const Config& ConfigManager::get() const { return *mConfig; }

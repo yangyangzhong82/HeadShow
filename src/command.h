@@ -1,0 +1,3 @@
+namespace hs {
+void RegisterCommand();
+}
