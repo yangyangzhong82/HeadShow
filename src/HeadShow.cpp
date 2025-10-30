@@ -46,7 +46,7 @@ ll::coro::CoroTask<> sendHeadShowPacketTask() {
                     if (it != config.entityNameOverrides.end()) {
                         if (entityTypeName == "minecraft:player") {
                             PA::PlayerContext ctx;
-                            ctx.player = &player; // Use the current player for player-specific placeholders
+                            ctx.player = static_cast<Player*>(entity); 
                             stream.writeString(PA::PA_GetPlaceholderService()->replace(it->second, &ctx), nullptr, nullptr);
                         } else {
                             PA::ActorContext ctx;

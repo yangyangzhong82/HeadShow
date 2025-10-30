@@ -11,8 +11,8 @@
 #include <vector>
 
 
-#include "Config/ConfigManager.h" // 引入配置管理器
-#include "logger.h"               // 引入logger
+#include "Config/ConfigManager.h" 
+#include "logger.h"               
 
 
 namespace hs {
@@ -31,12 +31,11 @@ void ReloadCommand(CommandOrigin const& origin, CommandOutput& output) {
 void RegisterCommand() {
     using ll::command::CommandHandle;
     using ll::command::CommandRegistrar;
-    using ll::command::EmptyParam; // 引入 EmptyParam
+    using ll::command::EmptyParam; 
 
     auto& registrar = CommandRegistrar::getInstance();
     auto& command = registrar.getOrCreateCommand("hs", "重新加载hs配置", CommandPermissionLevel::GameDirectors);
 
-    // 注册 'reload' 命令
     command
         .overload<EmptyParam>() 
         .text("reload")
