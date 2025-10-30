@@ -54,7 +54,7 @@ ll::coro::CoroTask<> sendHeadShowPacketTask() {
                             stream.writeString(PA::PA_GetPlaceholderService()->replace(it->second, &ctx), nullptr, nullptr);
                         }
                     } else {
-                        stream.writeString(entityTypeName, nullptr, nullptr);
+                        continue; // 如果实体不在配置里，就不对其设置显示
                     }
                     stream.writeUnsignedVarInt((uint)ActorDataIDs::NametagAlwaysShow, nullptr, nullptr);
                     stream.writeUnsignedVarInt((uint)DataItemType::Byte, nullptr, nullptr);
