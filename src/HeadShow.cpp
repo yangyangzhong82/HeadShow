@@ -45,13 +45,11 @@ ll::coro::CoroTask<> sendHeadShowPacketTask() {
                     auto it = config.entityNameOverrides.find(entityTypeName);
                     if (it != config.entityNameOverrides.end()) {
                         if (entityTypeName == "minecraft:player") {
-                            PA::PlayerContext ctx;
-                            ctx.player = static_cast<Player*>(entity); 
-                            stream.writeString(PA::PA_GetPlaceholderService()->replace(it->second, &ctx), nullptr, nullptr);
+                            std::unique_ptr<PA::IContext> ctx_ptr = PA::PlayerContext::factory(static_cast<void*>(static_cast<Player*>(entity)));
+                            stream.writeString(PA::PA_GetPlaceholderService()->replace(it->second, ctx_ptr.get()), nullptr, nullptr);
                         } else {
-                            PA::ActorContext ctx;
-                            ctx.actor = entity;
-                            stream.writeString(PA::PA_GetPlaceholderService()->replace(it->second, &ctx), nullptr, nullptr);
+                            std::unique_ptr<PA::IContext> ctx_ptr = PA::ActorContext::factory(static_cast<void*>(entity));
+                            stream.writeString(PA::PA_GetPlaceholderService()->replace(it->second, ctx_ptr.get()), nullptr, nullptr);
                         }
                     } else {
                         continue; // 如果实体不在配置里，就不对其设置显示
