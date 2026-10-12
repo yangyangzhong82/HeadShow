@@ -4,12 +4,11 @@
 #include <nlohmann/json.hpp>
 #include <string_view>
 #include <type_traits>
-#include <utility> // for std::index_sequence
+#include <utility> 
 
 
 namespace nlohmann {
 
-// 通用序列化模板，适用于所有聚合类型 (C++17 或更高版本)
 template <typename T>
     requires std::is_aggregate_v<T>
 struct adl_serializer<T> {

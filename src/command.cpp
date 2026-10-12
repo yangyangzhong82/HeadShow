@@ -33,7 +33,7 @@ void RegisterCommand() {
     using ll::command::CommandRegistrar;
     using ll::command::EmptyParam; 
 
-    auto& registrar = CommandRegistrar::getInstance();
+    auto& registrar = CommandRegistrar::getInstance(false);
     auto& command = registrar.getOrCreateCommand("hs", "重新加载hs配置", CommandPermissionLevel::GameDirectors);
 
     command
