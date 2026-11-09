@@ -43,6 +43,7 @@ bool Entry::enable() {
 bool Entry::disable() {
     getSelf().getLogger().debug("Disabling...");
     // Code for disabling the mod goes here.
+    stopHeadShow();
     return true;
 }
 
